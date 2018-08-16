@@ -75,7 +75,7 @@ class ProblemCommand:
     def __call__(self, args):
         """Run the command with the given argparse arguments."""
         problem = Problem(args.problem_id)
-        self.run(problem, args)
+        return self.run(problem, args)
 
     def create_parser(self, subparsers):
         """Create a parser for the problem."""
@@ -90,7 +90,10 @@ class ProblemCommand:
         return parser
 
     def run(self, problem, args):
-        """Run the command."""
+        """Run the command.
+
+        This should raise for errors, but can optionally return an exit code.
+        """
         raise NotImplementedError
 
 
@@ -182,7 +185,7 @@ class DownloadSamplesCommand(ProblemCommand):
 def main():
     """The main entry point of the program.
 
-    Returns None if it succeded, and an exit code otherwise
+    Returns the program's exit code.
     """
     commands = [
         RunCommand(),
@@ -200,13 +203,14 @@ def main():
     args = parser.parse_args()
 
     try:
-        args.func(args)
+        exit_code = args.func(args)
     except ValueError as e:
         print_err(e)
         return 1
 
+    return exit_code if exit_code is not None else 0
+
 
 if __name__ == "__main__":
     exit_code = main()
-    if exit_code is not None:
-        sys.exit(exit_code)
+    sys.exit(exit_code)
