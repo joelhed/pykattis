@@ -23,15 +23,15 @@ def print_with_value(message: str, value: str):
 class Problem:
     """A Kattis problem-solution pair."""
 
-    def __init__(self, problem_id):
-        self.problem_id = problem_id
+    def __init__(self, id_):
+        self.id = id_
 
         if not importlib.util.find_spec(self.solution_module_str):
-            raise ValueError(f"No solution for problem '{self.problem_id}'")
+            raise ValueError(f"No solution for problem '{self.id}'")
 
     @property
     def package_str(self):
-        return f"problems.{self.problem_id}"
+        return f"problems.{self.id}"
 
     @property
     def solution_module_str(self):
