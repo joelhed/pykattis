@@ -162,7 +162,7 @@ class Problem:
 
     def create_directory(self):
         """Create the directory for the problem if it doesn't already exist."""
-        self.package_path.mkdir(exist_ok=True)
+        self.package_path.mkdir(parents=True, exist_ok=True)
         (self.package_path / "__init__.py").touch()
 
 
