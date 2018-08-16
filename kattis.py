@@ -1,10 +1,13 @@
 #!/usr/bin/env python3.6
 """"""
 import sys
+import io
 import argparse
 import importlib
 import pkg_resources
 import json
+import zipfile
+import requests
 
 
 def print_err(*args, **kwargs):
@@ -82,6 +85,7 @@ class ProblemCommand:
         parser = subparsers.add_parser(
             self.__class__.command_name, help=self.__class__.__doc__
         )
+        parser.add_argument("problem_id", help="The Kattis problem ID")
         parser.set_defaults(func=self)
         return parser
 
@@ -122,24 +126,76 @@ class SamplesCommand(ProblemCommand):
                 print_with_value("Actual answer:", answer)
 
 
+class DownloadSamplesCommand(ProblemCommand):
+    """Download the problem's samples."""
+
+    command_name = "download_samples"
+
+    def create_parser(self, *args, **kwargs):
+        parser = super().create_parser(*args, **kwargs)
+        parser.add_argument(
+            "out", type=argparse.FileType("w", encoding="utf8"), default="-"
+        )
+
+    def run(self, problem, args):
+        resp = requests.get(
+            f"https://open.kattis.com/problems/{problem.id}/file/statement/samples.zip",
+            stream=True,
+        )
+        # TODO: Chech if it's 404 not found, and raise appropriately
+        resp.raise_for_status()
+
+        samples_io = io.BytesIO()
+        for chunk in resp:
+            samples_io.write(chunk)
+        samples_io.seek(0)
+
+        samples_zip = zipfile.ZipFile(samples_io)
+        filename_list = samples_zip.namelist()
+        input_answer_dicts = []
+        for filename in filename_list:
+            if not filename.endswith(".in"):
+                continue
+            # filename is now an input filename
+
+            base_name = filename[:-3]  # removes the ".in", which has length 3
+            answer_filename = base_name + ".ans"
+            if answer_filename not in filename_list:
+                # This should never happen.
+                raise ValueError(f"Could not find matching *.ans file for {filename}")
+
+            input_bytes = samples_zip.read(filename)
+            answer_bytes = samples_zip.read(answer_filename)
+
+            input_answer_dicts.append(
+                {
+                    "input": input_bytes.decode("utf8"),
+                    "answer": answer_bytes.decode("utf8"),
+                }
+            )
+
+        json.dump(input_answer_dicts, args.out, indent=4)
+        args.out.write("\n")
+        # samples_zip.extractall("./samples")
+
+
 def main():
     """The main entry point of the program.
 
     Returns None if it succeded, and an exit code otherwise
     """
-    # kattis.py run planina
-    run = RunCommand()
-    # kattis.py samples planina
-    samples = SamplesCommand()
-    # kattis.py generate_script planina output.py
+    commands = [
+        RunCommand(),
+        SamplesCommand(),
+        DownloadSamplesCommand(),
+        # kattis.py generate_script planina output.py
+    ]
 
     parser = argparse.ArgumentParser(description=__doc__)
+
     subparsers = parser.add_subparsers()
-
-    samples.create_parser(subparsers)
-    run.create_parser(subparsers)
-
-    parser.add_argument("problem_id", help="The Kattis problem ID")
+    for command in commands:
+        command.create_parser(subparsers)
 
     args = parser.parse_args()
 
