@@ -129,11 +129,11 @@ def main():
     
     Returns None if it succeded, and an exit code otherwise
     """
-    # solve.py run planina
+    # kattis.py run planina
     run = RunCommand()
-    # solve.py samples planina
+    # kattis.py samples planina
     samples = SamplesCommand()
-    # solve.py generate_script planina output.py
+    # kattis.py generate_script planina output.py
 
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers()
