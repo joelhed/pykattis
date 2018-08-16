@@ -20,6 +20,33 @@ def print_with_value(message: str, value: str):
     print(stripped_value)
 
 
+def samples(problem_package_str, solution):
+    """Run the solution on its defined sample inputs and outputs."""
+    samples_filename = "samples.json"
+    #if not pkg_resources.resource_exists(problem_package_str, samples_filename):
+        #return
+
+    samples_file = pkg_resources.resource_stream(problem_package_str, samples_filename)
+    # TODO: show a friendly error message for failing to parse the file.
+    samples = json.load(samples_file)
+
+    for sample in samples:
+        # TODO: show a friendly error message if the sample lacks a field
+        input_, expected_output = sample["input"], sample["output"]
+
+        # Print the iteration's input on one line if it fits
+        print_with_value("Solving with input:", input_)
+
+        output = solution.solve(input_)
+
+        if output.strip() == expected_output.strip():
+            print_with_value("Success! Output was:", output)
+        else:
+            print("Failure")
+            print_with_value("Expected output:", expected_output)
+            print_with_value("Actual output:", output)
+
+
 def main():
     """The main entry point of the program.
     
@@ -43,29 +70,7 @@ def main():
         return 1
 
     if args.samples:
-        samples_filename = "samples.json"
-        #if not pkg_resources.resource_exists(problem_package_str, samples_filename):
-            #return
-
-        samples_file = pkg_resources.resource_stream(problem_package_str, samples_filename)
-        # TODO: show a friendly error message for failing to parse the file.
-        samples = json.load(samples_file)
-
-        for sample in samples:
-            # TODO: show a friendly error message if the sample lacks a field
-            input_, expected_output = sample["input"], sample["output"]
-
-            # Print the iteration's input on one line if it fits
-            print_with_value("Solving with input:", input_)
-
-            output = solution.solve(input_)
-
-            if output.strip() == expected_output.strip():
-                print_with_value("Success! Output was:", output)
-            else:
-                print("Failure")
-                print_with_value("Expected output:", expected_output)
-                print_with_value("Actual output:", output)
+        return samples(problem_package_str, solution)
 
     else:
         input_ = sys.stdin.read()
