@@ -1,5 +1,5 @@
 #!/usr/bin/env python3.6
-"""Run the solution of a given Kattis problem ID."""
+""""""
 import sys
 import argparse
 import importlib
@@ -20,31 +20,108 @@ def print_with_value(message: str, value: str):
     print(stripped_value)
 
 
-def samples(problem_package_str, solution):
-    """Run the solution on its defined sample inputs and outputs."""
-    samples_filename = "samples.json"
-    #if not pkg_resources.resource_exists(problem_package_str, samples_filename):
-        #return
+class Problem:
+    """A Kattis problem-solution pair."""
 
-    samples_file = pkg_resources.resource_stream(problem_package_str, samples_filename)
-    # TODO: show a friendly error message for failing to parse the file.
-    samples = json.load(samples_file)
+    def __init__(self, problem_id):
+        self.problem_id = problem_id
 
-    for sample in samples:
-        # TODO: show a friendly error message if the sample lacks a field
-        input_, expected_output = sample["input"], sample["output"]
+        if not importlib.util.find_spec(self.solution_module_str):
+            raise ValueError(f"No solution for problem '{self.problem_id}'")
 
-        # Print the iteration's input on one line if it fits
-        print_with_value("Solving with input:", input_)
+    @property
+    def package_str(self):
+        return f"problems.{self.problem_id}"
 
-        output = solution.solve(input_)
+    @property
+    def solution_module_str(self):
+        return f"{self.package_str}.solution"
 
-        if output.strip() == expected_output.strip():
-            print_with_value("Success! Output was:", output)
-        else:
-            print("Failure")
-            print_with_value("Expected output:", expected_output)
-            print_with_value("Actual output:", output)
+    def get_solution_module(self):
+        return importlib.import_module(self.solution_module_str)
+
+    def samples(self):
+        """A generator for the samples of the problem.
+
+        This yields a 2-tuple of the input and the expected output as strings.
+        """
+        samples_filename = "samples.json"
+        # if not pkg_resources.resource_exists(problem_package_str, samples_filename):
+        #     return
+
+        samples_file = pkg_resources.resource_stream(
+            self.package_str, samples_filename
+        )
+
+        # TODO: show a friendly error message when failing to parse the file.
+        samples = json.load(samples_file)
+
+        for sample in samples:
+            # TODO: show a friendly error message if the sample lacks a field
+            input_, expected_output = sample["input"], sample["output"]
+
+            yield input_, expected_output
+ 
+
+class ProblemCommand:
+    """A cli command that deals with a Kattis problem."""
+
+    command_name = None
+
+    def __init__(self):
+        """Initialize the command."""
+
+    def __call__(self, args):
+        """Run the command with the given argparse arguments."""
+        problem = Problem(args.problem_id)
+        self.run(problem, args)
+
+    def create_parser(self, subparsers):
+        """Create a parser for the problem."""
+        if self.__class__.command_name is None:
+            raise NotImplementedError
+
+        parser = subparsers.add_parser(
+            self.__class__.command_name, help=self.__class__.__doc__
+        )
+        parser.set_defaults(func=self)
+        return parser
+
+    def run(self, problem, args):
+        """Run the command."""
+        raise NotImplementedError
+
+
+class RunCommand(ProblemCommand):
+    """Run the solution program."""
+
+    command_name = "run"
+
+    def run(self, problem, args):
+        input_ = sys.stdin.read()
+        output = problem.get_solution_module().solve(input_)
+        print(output)
+
+
+class SamplesCommand(ProblemCommand):
+    """Run a solution on its defined sample inputs and outputs."""
+
+    command_name = "samples"
+
+    def run(self, problem, args):
+        solution_module = problem.get_solution_module()
+
+        for input_, expected_output in problem.samples():
+            print_with_value("Solving with input:", input_)
+
+            output = solution_module.solve(input_)
+
+            if output.strip() == expected_output.strip():
+                print_with_value("Success! Output was:", output)
+            else:
+                print("Failure")
+                print_with_value("Expected output:", expected_output)
+                print_with_value("Actual output:", output)
 
 
 def main():
@@ -52,30 +129,27 @@ def main():
     
     Returns None if it succeded, and an exit code otherwise
     """
+    # solve.py run planina
+    run = RunCommand()
+    # solve.py samples planina
+    samples = SamplesCommand()
+    # solve.py generate_script planina output.py
+
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--samples",
-        action="store_true",
-        help="Run the solution on its defined sample inputs and outputs",
-    )
+    subparsers = parser.add_subparsers()
+
+    samples.create_parser(subparsers)
+    run.create_parser(subparsers)
+
     parser.add_argument("problem_id", help="The Kattis problem ID")
+
     args = parser.parse_args()
 
-    problem_package_str = f"problems.{args.problem_id}"
-
     try:
-        solution = importlib.import_module(f"{problem_package_str}.solution")
-    except ModuleNotFoundError:
-        print_err(f"No solution for problem '{args.problem_id}'")
+        args.func(args)
+    except ValueError as e:
+        print_err(e)
         return 1
-
-    if args.samples:
-        return samples(problem_package_str, solution)
-
-    else:
-        input_ = sys.stdin.read()
-        output = solution.solve(input_)
-        print(output)
 
 
 if __name__ == "__main__":
