@@ -199,6 +199,35 @@ class ProblemCommand:
         raise NotImplementedError
 
 
+class CreateCommand(ProblemCommand):
+    """Create a problem directory from a template, and download the samples."""
+
+    command_name = "create"
+
+    def create_parser(self, *args, **kwargs):
+        parser = super().create_parser(*args, **kwargs)
+        parser.add_argument("--overwrite", action="store_true")
+        return parser
+
+    def run(self, problem, args):
+        problem.create_directory()
+
+        # TODO: Extract
+        solution_path = problem.package_path / "solution.py"
+        if solution_path.exists() and not args.overwrite:
+            print_err("Solution already exists. Continuing...")
+        else:
+            print_err(f"Writing template solution file '{solution_path}'")
+            solution_template = pkg_resources.resource_string(
+                __name__, "solution_template.py"
+            ).decode("utf8")
+            with solution_path.open("w") as f:
+                f.write(solution_template.format(problem=problem))
+
+        problem.samples.download()
+        problem.samples.save()
+
+
 class RunCommand(ProblemCommand):
     """Run the solution program."""
 
@@ -251,6 +280,7 @@ def main():
     Returns the program's exit code.
     """
     commands = [
+        CreateCommand(),
         RunCommand(),
         SamplesCommand(),
         DownloadSamplesCommand(),
