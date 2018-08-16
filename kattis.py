@@ -239,10 +239,10 @@ class RunCommand(ProblemCommand):
         print(answer)
 
 
-class SamplesCommand(ProblemCommand):
+class TestCommand(ProblemCommand):
     """Run a solution on its defined sample inputs and answers."""
 
-    command_name = "samples"
+    command_name = "test"
 
     def run(self, problem, args):
         for input_, expected_answer in problem.samples:
@@ -266,7 +266,11 @@ class DownloadSamplesCommand(ProblemCommand):
     def create_parser(self, *args, **kwargs):
         parser = super().create_parser(*args, **kwargs)
         parser.add_argument(
-            "out", type=argparse.FileType("w", encoding="utf8"), default="-"
+            "out",
+            type=argparse.FileType("w", encoding="utf8"),
+            nargs="?",
+            default="-",
+            help="The output file, default stdout",
         )
 
     def run(self, problem, args):
@@ -282,9 +286,8 @@ def main():
     commands = [
         CreateCommand(),
         RunCommand(),
-        SamplesCommand(),
+        TestCommand(),
         DownloadSamplesCommand(),
-        # kattis.py generate_script planina output.py
     ]
 
     parser = argparse.ArgumentParser(description=__doc__)
