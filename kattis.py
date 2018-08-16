@@ -43,25 +43,23 @@ class Problem:
     def samples(self):
         """A generator for the samples of the problem.
 
-        This yields a 2-tuple of the input and the expected output as strings.
+        This yields a 2-tuple of the input and the answer as strings.
         """
         samples_filename = "samples.json"
         # if not pkg_resources.resource_exists(problem_package_str, samples_filename):
         #     return
 
-        samples_file = pkg_resources.resource_stream(
-            self.package_str, samples_filename
-        )
+        samples_file = pkg_resources.resource_stream(self.package_str, samples_filename)
 
         # TODO: show a friendly error message when failing to parse the file.
         samples = json.load(samples_file)
 
         for sample in samples:
             # TODO: show a friendly error message if the sample lacks a field
-            input_, expected_output = sample["input"], sample["output"]
+            input_, answer = sample["input"], sample["answer"]
 
-            yield input_, expected_output
- 
+            yield input_, answer
+
 
 class ProblemCommand:
     """A cli command that deals with a Kattis problem."""
@@ -99,34 +97,34 @@ class RunCommand(ProblemCommand):
 
     def run(self, problem, args):
         input_ = sys.stdin.read()
-        output = problem.get_solution_module().solve(input_)
-        print(output)
+        answer = problem.get_solution_module().solve(input_)
+        print(answer)
 
 
 class SamplesCommand(ProblemCommand):
-    """Run a solution on its defined sample inputs and outputs."""
+    """Run a solution on its defined sample inputs and answers."""
 
     command_name = "samples"
 
     def run(self, problem, args):
         solution_module = problem.get_solution_module()
 
-        for input_, expected_output in problem.samples():
+        for input_, expected_answer in problem.samples():
             print_with_value("Solving with input:", input_)
 
-            output = solution_module.solve(input_)
+            answer = solution_module.solve(input_)
 
-            if output.strip() == expected_output.strip():
-                print_with_value("Success! Output was:", output)
+            if answer.strip() == expected_answer.strip():
+                print_with_value("Success! Output was:", answer)
             else:
                 print("Failure")
-                print_with_value("Expected output:", expected_output)
-                print_with_value("Actual output:", output)
+                print_with_value("Expected answer:", expected_answer)
+                print_with_value("Actual answer:", answer)
 
 
 def main():
     """The main entry point of the program.
-    
+
     Returns None if it succeded, and an exit code otherwise
     """
     # kattis.py run planina
