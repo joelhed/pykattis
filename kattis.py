@@ -7,6 +7,8 @@ import importlib
 import pkg_resources
 import json
 import zipfile
+from typing import NamedTuple
+from pathlib import Path
 import requests
 
 
@@ -23,14 +25,120 @@ def print_with_value(message: str, value: str):
     print(stripped_value)
 
 
+class Sample(NamedTuple):
+    """A sample input-answer pair."""
+
+    input: str
+    answer: str
+
+    def to_dict(self):
+        return {"input": self.input, "answer": self.answer}
+
+
+class Samples:
+    """A list of samples for a problem."""
+
+    def __init__(self, problem):
+        self.problem = problem
+        self._samples = []
+        self._path = self.problem.package_path / "samples.json"
+
+    def __iter__(self):
+        if not self._samples:
+            self.load()
+
+        return iter(self._samples)
+
+    def __len__(self):
+        return len(self._samples)
+
+    def download(self):
+        """Download the problem's samples."""
+        resp = requests.get(
+            f"https://open.kattis.com/problems/{self.problem.id}"
+            "/file/statement/samples.zip",
+            stream=True,
+        )
+        if resp.status_code == 404:
+            raise ValueError(
+                f"The problem '{self.problem}' does not exist on kattis.com"
+            )
+        resp.raise_for_status()
+
+        samples_io = io.BytesIO()
+        for chunk in resp:
+            samples_io.write(chunk)
+        samples_io.seek(0)
+
+        samples_zip = zipfile.ZipFile(samples_io)
+        filename_list = samples_zip.namelist()
+        samples = []
+        for filename in sorted(filename_list):
+            if not filename.endswith(".in"):
+                continue
+            # filename is now an input filename
+
+            base_name = filename[:-3]  # removes the ".in", which has length 3
+            answer_filename = base_name + ".ans"
+            if answer_filename not in filename_list:
+                # This should never happen.
+                raise ValueError(
+                    f"Could not find a matching '{answer_filename}' file "
+                    f"for '{filename}' in the downloaded zipfile."
+                )
+
+            input_bytes = samples_zip.read(filename)
+            answer_bytes = samples_zip.read(answer_filename)
+
+            samples.append(
+                Sample(input_bytes.decode("utf8"), answer_bytes.decode("utf8"))
+            )
+
+        self._samples = samples
+
+    def file_exists(self):
+        """Check wether the file exists."""
+        return self._path.exists()
+
+    def load(self):
+        """Load the samples from its file."""
+        if not self.file_exists():
+            raise ValueError(f"The sample file at '{self._path}' doesn't exist")
+
+        # TODO: raise with friendly error messages when failing to parse the file
+        with self._path.open("r") as f:
+            sample_dicts = json.load(f)
+
+        samples = [Sample(**sample_dict) for sample_dict in sample_dicts]
+        self._samples = samples
+
+    def save(self, file_=None):
+        """Save the samples to its file."""
+        if file_ is None:
+            if self.file_exists():
+                print_err("Samples file exists. Overwriting...")
+            file_ = open(self._path, "w")
+
+        sample_dicts = [sample.to_dict() for sample in self._samples]
+        with file_:
+            json.dump(sample_dicts, file_, indent=4)
+            file_.write("\n")
+
+
 class Problem:
     """A Kattis problem-solution pair."""
 
     def __init__(self, id_):
         self.id = id_
+        self._solution_module = None
+        self.package_path = Path("problems", self.id)
+        self.samples = Samples(self)
 
-        if not importlib.util.find_spec(self.solution_module_str):
-            raise ValueError(f"No solution for problem '{self.id}'")
+    def __repr__(self):
+        return f"<Problem {self.id!r}>"
+
+    def __str__(self):
+        return self.id
 
     @property
     def package_str(self):
@@ -40,28 +148,22 @@ class Problem:
     def solution_module_str(self):
         return f"{self.package_str}.solution"
 
-    def get_solution_module(self):
-        return importlib.import_module(self.solution_module_str)
+    @property
+    def solution_module(self):
+        if self._solution_module is None:
+            try:
+                self._solution_module = importlib.import_module(
+                    self.solution_module_str
+                )
+            except ModuleNotFoundError:
+                raise ValueError(f"No solution for problem '{self.id}'")
 
-    def samples(self):
-        """A generator for the samples of the problem.
+        return self._solution_module
 
-        This yields a 2-tuple of the input and the answer as strings.
-        """
-        samples_filename = "samples.json"
-        # if not pkg_resources.resource_exists(problem_package_str, samples_filename):
-        #     return
-
-        samples_file = pkg_resources.resource_stream(self.package_str, samples_filename)
-
-        # TODO: show a friendly error message when failing to parse the file.
-        samples = json.load(samples_file)
-
-        for sample in samples:
-            # TODO: show a friendly error message if the sample lacks a field
-            input_, answer = sample["input"], sample["answer"]
-
-            yield input_, answer
+    def create_directory(self):
+        """Create the directory for the problem if it doesn't already exist."""
+        self.package_path.mkdir(exist_ok=True)
+        (self.package_path / "__init__.py").touch()
 
 
 class ProblemCommand:
@@ -83,7 +185,7 @@ class ProblemCommand:
             raise NotImplementedError
 
         parser = subparsers.add_parser(
-            self.__class__.command_name, help=self.__class__.__doc__
+            self.__class__.command_name, description=self.__class__.__doc__
         )
         parser.add_argument("problem_id", help="The Kattis problem ID")
         parser.set_defaults(func=self)
@@ -104,7 +206,7 @@ class RunCommand(ProblemCommand):
 
     def run(self, problem, args):
         input_ = sys.stdin.read()
-        answer = problem.get_solution_module().solve(input_)
+        answer = problem.solution_module.solve(input_)
         print(answer)
 
 
@@ -114,12 +216,10 @@ class SamplesCommand(ProblemCommand):
     command_name = "samples"
 
     def run(self, problem, args):
-        solution_module = problem.get_solution_module()
-
-        for input_, expected_answer in problem.samples():
+        for input_, expected_answer in problem.samples:
             print_with_value("Solving with input:", input_)
 
-            answer = solution_module.solve(input_)
+            answer = problem.solution_module.solve(input_)
 
             if answer.strip() == expected_answer.strip():
                 print_with_value("Success! Output was:", answer)
@@ -141,45 +241,8 @@ class DownloadSamplesCommand(ProblemCommand):
         )
 
     def run(self, problem, args):
-        resp = requests.get(
-            f"https://open.kattis.com/problems/{problem.id}/file/statement/samples.zip",
-            stream=True,
-        )
-        # TODO: Chech if it's 404 not found, and raise appropriately
-        resp.raise_for_status()
-
-        samples_io = io.BytesIO()
-        for chunk in resp:
-            samples_io.write(chunk)
-        samples_io.seek(0)
-
-        samples_zip = zipfile.ZipFile(samples_io)
-        filename_list = samples_zip.namelist()
-        input_answer_dicts = []
-        for filename in filename_list:
-            if not filename.endswith(".in"):
-                continue
-            # filename is now an input filename
-
-            base_name = filename[:-3]  # removes the ".in", which has length 3
-            answer_filename = base_name + ".ans"
-            if answer_filename not in filename_list:
-                # This should never happen.
-                raise ValueError(f"Could not find matching *.ans file for {filename}")
-
-            input_bytes = samples_zip.read(filename)
-            answer_bytes = samples_zip.read(answer_filename)
-
-            input_answer_dicts.append(
-                {
-                    "input": input_bytes.decode("utf8"),
-                    "answer": answer_bytes.decode("utf8"),
-                }
-            )
-
-        json.dump(input_answer_dicts, args.out, indent=4)
-        args.out.write("\n")
-        # samples_zip.extractall("./samples")
+        problem.samples.download()
+        problem.samples.save(args.out)
 
 
 def main():
@@ -195,6 +258,7 @@ def main():
     ]
 
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.set_defaults(func=lambda args: parser.print_help())
 
     subparsers = parser.add_subparsers()
     for command in commands:
@@ -212,5 +276,4 @@ def main():
 
 
 if __name__ == "__main__":
-    exit_code = main()
-    sys.exit(exit_code)
+    sys.exit(main())
