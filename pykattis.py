@@ -1,5 +1,5 @@
 #!/usr/bin/env python3.6
-""""""
+"""A CLI tool for solving Kattis problems."""
 import sys
 import io
 import argparse
@@ -54,6 +54,7 @@ class Samples:
 
     def download(self):
         """Download the problem's samples."""
+        # TODO: Check the Kattis ToS section 6. Automated Access
         resp = requests.get(
             f"https://open.kattis.com/problems/{self.problem.id}"
             "/file/statement/samples.zip",
@@ -206,7 +207,11 @@ class CreateCommand(ProblemCommand):
 
     def create_parser(self, *args, **kwargs):
         parser = super().create_parser(*args, **kwargs)
-        parser.add_argument("--overwrite", action="store_true")
+        parser.add_argument(
+            "--overwrite",
+            action="store_true",
+            help="Overwrite the contents of the solution directory",
+        )
         return parser
 
     def run(self, problem, args):
