@@ -104,7 +104,7 @@ setup(
     packages=find_packages(exclude=('tests',)),
     # If your package is a single module, use this instead of 'packages':
     # py_modules=["pykattis"],
-    entry_points={"console_scripts": ["pykattis=pykattis:main"]},
+    entry_points={"console_scripts": ["pykattis=pykattis.cli:main"]},
     install_requires=REQUIRED,
     extras_require=EXTRAS,
     include_package_data=True,
