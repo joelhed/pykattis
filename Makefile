@@ -1,4 +1,4 @@
-files = *.py
+files = **/*.py
 
 lint:
 	pipenv run flake8 $(files)
