@@ -46,3 +46,4 @@ pykattis download_samples {problem_id}
 ```
 
 It is recommended to use a VCS, like [git](https://git-scm.com/), to keep track of your solutions.
+Do not publish them publicly though, since it makes it easier for others to cheat, and could mark you for plagiarism due to others copying your code.
