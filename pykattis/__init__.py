@@ -156,7 +156,8 @@ class Problem:
                 self._solution_module = importlib.import_module(
                     self.solution_module_str
                 )
-            except ModuleNotFoundError:
+            except ModuleNotFoundError as e:
+                raise e
                 raise ValueError(f"No solution for problem '{self.id}'")
 
         return self._solution_module
@@ -303,6 +304,8 @@ def main():
         command.create_parser(subparsers)
 
     args = parser.parse_args()
+
+    sys.path.append(str(Path.cwd()))
 
     try:
         exit_code = args.func(args)
