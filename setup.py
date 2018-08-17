@@ -9,7 +9,7 @@ import os
 import sys
 from shutil import rmtree
 
-from setuptools import setup, Command  # , find_packages
+from setuptools import setup, Command, find_packages
 
 # Package meta-data.
 NAME = "pykattis"
@@ -18,7 +18,7 @@ URL = "https://github.com/joelhed/pykattis"
 EMAIL = "joel.hedtjarn@gmail.com"
 AUTHOR = "Joel Hedtjärn"
 REQUIRES_PYTHON = ">=3.6.0"
-VERSION = "0.0.1"
+VERSION = "0.0.2"
 
 # What packages are required for this module to be executed?
 REQUIRED = [
@@ -101,9 +101,9 @@ setup(
     author_email=EMAIL,
     python_requires=REQUIRES_PYTHON,
     url=URL,
-    # packages=find_packages(exclude=('tests',)),
+    packages=find_packages(exclude=('tests',)),
     # If your package is a single module, use this instead of 'packages':
-    py_modules=["pykattis"],
+    # py_modules=["pykattis"],
     entry_points={"console_scripts": ["pykattis=pykattis:main"]},
     install_requires=REQUIRED,
     extras_require=EXTRAS,

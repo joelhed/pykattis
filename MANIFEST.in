@@ -1,2 +1,2 @@
 include README.md
-include solution_template.py
+include pykattis/solution_template.py
